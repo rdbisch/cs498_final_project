@@ -1,12 +1,16 @@
 # Thermostat.py
 # Smart Thermostat to control Smart Registers
 import time
+import math
 
 # Local temp
 import TempSensor
 
 # How many readings to keep local
 queue_size = 10
+
+class ThermostatException(Exception):
+    pass
 
 # This is an abstract data structure
 #  to represent a (remote) physical device.
@@ -22,9 +26,9 @@ class SmartRegister:
 
     def registerReading(self, temp):
         self.lastReading = time.time()
-        self.temps ++ temp
+        self.temps.append(temp)
         if len(self.temps) > queue_size:
-            self.temps.pop_front()
+            self.temps.pop(0)
 
     def openRegister(self):
         assert(self.state == SR_CLOSED)
@@ -38,20 +42,20 @@ class SmartRegister:
         if self.state == SR_CLOSED: self.openRegister()
         elif self.state == SR_OPEN: self.closeRegister()
         else: 
-            raise "Register in unknown state"
+            raise ThermostatException("Register in unknown state")
+
 
 class SmartThermostat:
     def __init__(self, radio):
         self.radio = radio
         self.registers = {}
         self.ambientTemp = []
-        self.mode = HEAT
 
     def readTemp():
         t = TempSensor.read_temp()
         self.ambientTemp ++ t
         if len(self.ambientTemp) > queue_size:
-            self.ambientTemp.pop_front()
+            self.ambientTemp.pop(0)
 
     # Ordinary clock tick with no radio activity
     def tick(self):
@@ -67,29 +71,36 @@ class SmartThermostat:
                      "MAN": self.manual }
         mesgs = mesg.split(' ')
         if (mesgs[0] not in commands):
-            raise "Unknown command {} with args {} in SmartThermostat.recv.".format(mesgs[0], msg)
+            print("Command was -->|{}|<--".format(mesgs[0]))
+            for k in commands.keys():
+                print("\t{} == {}?   {}".format(k, mesgs[0], k == mesgs[0]))
+            raise ThermostatException("Unknown command {} with args {} in SmartThermostat.recv.".format(mesgs[0], mesg))
         else:
-            commands[mesgs[0]](mesg[1:])
+            print("THERMOSTAT recv {} args {}".format(mesgs[0], mesgs[1:]))
+            commands[mesgs[0]](mesgs[1:])
     
     def addr(self, args):
         # Find first unused address.
-        if len(registers) == 0: addr = 1
-        else: addr = int(math.log2(max(registers.keys()))) + 1
+        if len(self.registers) == 0: addr = 1
+        else: 
+            max_addr = max(self.registers.keys())
+            addr = int(math.log2(max_addr)) + 1
         if addr > 31:
-            raise "Out of addresses in SmartThermostat."
+            raise ThermostatException("Out of addresses in SmartThermostat.")
 
-        addr = 2**i
+        addr = 2**addr
         reg = SmartRegister(addr)
-        assert(addr not in registers)
-        registers[addr] = reg
+        assert(addr not in self.registers)
+        self.registers[addr] = reg
+        self.radio.send("SETADDR {}".format(addr))
 
     def post(self, args):
         addr = int(args[0])
-        assert(addr in registers)
-        registers[addr].registerReading(float(args[1]))
+        assert(addr in self.registers)
+        self.registers[addr].registerReading(float(args[1]))
 
     # A human changed the register setting manually.
     def manual(self, args):
         addr = int(args[0])
-        assert(addr in registers)
-        registers[addr].flipState()
+        assert(addr in self.registers)
+        self.registers[addr].flipState()

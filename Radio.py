@@ -23,9 +23,16 @@ class Radio:
         self.rfm9x = adafruit_rfm9x.RFM9x(self.spi, self.CS, self.RESET, 915.0)
         self.rfm9x.tx_power = 23
         self.prev_packet = None
+        self.packetCount = 0
+        self.badPackets = 0
     
     def mainLoop(self, recvCallback):
         while True:
+            self.packetCount += 1
+
+            if self.packetCount % 100 == 0:
+                print("Packets Received {} Bad {} % {}".format(self.packetCount, self.badPackets, float(self.badPackets/self.packetCount)))
+
             packet = self.rfm9x.receive(with_header=True, keep_listening=True)
             if packet == None:
                 time.sleep(0.1)
@@ -36,7 +43,11 @@ class Radio:
             #print("Received (raw header):", [hex(x) for x in packet[0:4]])
             #print("Received (raw payload): {0}".format(packet[4:]))
             #print("RSSI: {0}".format(self.rfm9x.last_rssi))
-            recvCallback(str(packet[4:], "cp437"))
+            try:
+                recvCallback(str(packet[4:], "utf-8"))
+            except UnicodeDecodeError as err:
+                print("### Error encoding packet {}\n{}".format(packet, err))
+                self.badPackets += 1
 
-    def send(msg):
-        self.rfm9x.send(bytearray(data, "cp437"))
+    def send(self, data):
+        self.rfm9x.send(bytearray(data, "utf-8"))
