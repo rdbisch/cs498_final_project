@@ -12,7 +12,6 @@
 #include <Adafruit_PCT2075.h>
 #include <SPI.h>
 #include <RH_RF95.h>
-#include "LowPower.h"
 
 /* for feather32u4 */
 #define RFM95_CS 8
@@ -27,6 +26,12 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 Adafruit_PCT2075 PCT2075;
 
+/* SmartRegister settings */
+#define SR_UNDEFINED 0xDEADBEEF
+#define SR_OPEN = 0
+#define SR_CLOSED = 1
+int sr_addr;
+int sr_state = SR_UNDEFINED;
  
 void setup() {
     pinMode(RFM95_RST, OUTPUT);
@@ -68,10 +73,31 @@ void setup() {
     // you can set transmitter powers from 5 to 23 dBm:
     rf95.setTxPower(23, false);
 
+    /*** Get address ***/
+    Serial.println("Getting address from controller.");
+    char radiopacket[10] = "ADDR";
+    rf95.send((uint8_t *)radiopacket, 4);
+
+    /*** Wait for address reply ***/
+    Serial.println("Waiting for address...");
+    uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
+    
+    if (rf95.waitAvailableTimeout(1000)) { 
+      // Should be a reply message for us now   
+      if (rf95.recv(buf, &len)) {
+        sscanf(buf, "SETADDR %d", &sr_addr);
+        Serial.print("Got reply: ");
+        Serial.println((char*)buf);
+        Serial.println("Set address to: ");
+        Serial.println(sr_addr);
+        Serial.print("RSSI: ");
+        Serial.println(rf95.lastRssi(), DEC);    
+      }
+    }
 
     /******* PCT2075 Setup **********/
     PCT2075 = Adafruit_PCT2075();
-
     while (1) {
         if (!PCT2075.begin()) {
             Serial.println("Couldn't find PCT2075 chip");
@@ -88,12 +114,17 @@ int16_t packetnum = 0;  // packet counter, we increment per xmission
  
 void loop()
 {
-  delay(1000); // Wait 1 second between transmits, could also 'sleep' here!
+  
+  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+  delay(500);                       // wait for a second
+  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
+  delay(500);  
+  
   Serial.println("Transmitting..."); // Send a message to rf95_server
 
   float f = PCT2075.getTemperature();
   char radiopacket[30];
-  sprintf(radiopacket, "Packet %d Temp %d.%02d", packetnum++, (int)f, (int)(f*100)%100);
+  sprintf(radiopacket, "POST %d %d.%02d", sr_addr, (int)f, (int)(f*100)%100);
 
   Serial.print("Sending "); Serial.println(radiopacket);
   radiopacket[29] = 0;
@@ -130,5 +161,11 @@ void loop()
     Serial.println("No reply, is there a listener around?");
   }
   Serial.println("Going to sleep for 8 seconds.");
-  LowPower.idle(SLEEP_8S, ADC_OFF, TIMER4_OFF, TIMER3_OFF, TIMER1_OFF, 
-        TIMER0_OFF, SPI_OFF, USART1_OFF, TWI_OFF, USB_OFF);}
+
+  // Mimic sleeping
+  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+  delay(500);                       // wait for a second
+  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
+  delay(500);  
+  delay(7000);
+}
