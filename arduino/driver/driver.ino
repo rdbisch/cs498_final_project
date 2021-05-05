@@ -156,16 +156,19 @@ next:
         unsigned int check_addr;
         int bytes;
         uint8_t* rest = 0;
+        
         int ret = sscanf(buf, "%u %n", &check_addr, &bytes);
         if (ret < 1 || check_addr != sr_addr) {
           goto next;
         }
 
-        Serial.println("Rest of message is %s\n", bytes + ret);
-        if (bytes[ret] == 'R') setFlag(bytes + ret);
-        else if (bytes[ret] == 'S') setBaffle(bytes + ret);
+        rest = buf + bytes;
+        if (rest[0] == 'R') setFlag(bytes + ret);
+        else if (rest[0] == 'S') setBaffle(bytes + ret);
         else {
-          Serial.println("Uhandled command.");
+          Serial.println("Unhandled command in message.");
+          Serial.println((char*)buf);
+          Serial.println("************");
         }
     }
   }
@@ -180,14 +183,7 @@ next:
 
 /** Handle SETFLAG message **/
 void setFlag(uint8_t* message) {
-  unsigned int check_addr;
-  int bytes;
-  uint8_t* rest = 0;
-  int ret = sscanf(buf, "%u %n", &check_addr, &bytes);
-  if (ret < 1 || check_addr != sr_addr) {
-
-  ret = sscanf(rest, "SETFLAG %d", &sr_flag);
-  if (ret == 1) break;
+  sscanf(message, "SETFLAG %d", &sr_flag);
 }
 
 /** Handle BAFFLE message **/
