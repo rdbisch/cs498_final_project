@@ -33,7 +33,7 @@ class Radio:
             if self.packetCount % 100 == 0:
                 print("Packets Received {} Bad {} % {}".format(self.packetCount, self.badPackets, float(self.badPackets/self.packetCount)))
 
-            packet = self.rfm9x.receive(with_header=True, keep_listening=True)
+            packet = self.rfm9x.receive(with_header=True, keep_listening=True, with_ack=True)
             if packet == None:
                 time.sleep(0.1)
                 continue
