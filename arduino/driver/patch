@@ -1,0 +1,20 @@
+26c26
+< #define RH_ASK_ARDUINO_USE_TIMER2
+---
+> //#define RH_ASK_ARDUINO_USE_TIMER2
+291c291
+<     TCCR3A = _BV(WGM31); // Turn on CTC mode)
+---
+>     TCCR2A = _BV(WGM21); // Turn on CTC mode)
+293c293
+<     TCCR3B = prescaler;
+---
+>     TCCR2B = prescaler;
+297c297
+<     OCR3A = nticks;
+---
+>     OCR2A = nticks;
+304c304
+<     TIMSK3 |= _BV(OCIE3A);
+---
+>     TIMSK |= _BV(OCIE2A);
