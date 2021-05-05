@@ -74,7 +74,6 @@ class SmartThermostat:
         # Our protocol is <addr> <command> <args>
         # Since we are the server, our valid address is 0 (broadcast) or 1.
         #  So if its not here, ignore the message
-        print(mesgs)
 
         addr = int(mesgs[0])
         if (addr != 0 and addr != 1): return
@@ -85,7 +84,6 @@ class SmartThermostat:
                 print("\t{} == {}?   {}".format(k, mesgs[1], k == mesgs[1]))
             raise ThermostatException("Unknown command {} with args {} in SmartThermostat.recv.".format(mesgs[1], mesg))
         else:
-            print("THERMOSTAT recv {} args {}".format(mesgs[1], mesgs[2:]))
             commands[mesgs[1]](mesgs[2:])
     
     def addr(self, args):
@@ -112,13 +110,16 @@ class SmartThermostat:
     def post(self, args):
         addr = int(args[0])
 
+        # This can happen if we reboot the thermostat
+        # while registers are still running
         if addr not in self.registers:
-            self.revoke(addr)
-        else:
-            self.registers[addr].registerReading(float(args[1]))
-
-    def revoke(self, addr):
-        self.radio.send("{} REVOKEFLAG".format(addr))
+            self.addr(args)
+        
+        try:
+            temp = float(args[1])
+            self.registers[addr].registerReading(temp)
+        except ValueError as err:
+            pass
 
     # A human changed the register setting manually.
     def manual(self, args):

@@ -30,7 +30,7 @@ class Radio:
         while True:
             self.packetCount += 1
 
-            if self.packetCount % 100 == 0:
+            if self.packetCount % 1000 == 0:
                 print("Packets Received {} Bad {} % {}".format(self.packetCount, self.badPackets, float(self.badPackets/self.packetCount)))
 
             packet = self.rfm9x.receive(with_header=True, keep_listening=True, with_ack=True)
@@ -44,10 +44,12 @@ class Radio:
             #print("Received (raw payload): {0}".format(packet[4:]))
             #print("RSSI: {0}".format(self.rfm9x.last_rssi))
             try:
+                print("<<< {}".format(packet[4:]))
                 recvCallback(str(packet[4:], "utf-8"))
             except UnicodeDecodeError as err:
                 print("### Error encoding packet {}\n{}".format(packet, err))
                 self.badPackets += 1
 
     def send(self, data):
+        print(">>> {}".format(data))
         self.rfm9x.send(bytearray(data, "utf-8"))
