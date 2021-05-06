@@ -1,7 +1,8 @@
 # Thermostat.py
 # Smart Thermostat to control Smart Registers
-import time
+from datetime import datetime, timedelta
 import math
+import pandas as pd
 
 # Local temp
 import TempSensor
@@ -20,16 +21,64 @@ SR_CLOSED = 1
 class SmartRegister:
     def __init__(self, addr, flag):
         self.temps = []
+        self.dates = []
+        self.flags = []        
         self.state = SR_OPEN
         self.addr = addr
         self.flag = flag
-        self.lastReading = None
 
-    def registerReading(self, temp):
-        self.lastReading = time.time()
+    def registerReading(self, temp, flag):        
         self.temps.append(temp)
-        if len(self.temps) > queue_size:
-            self.temps.pop(0)
+        self.dates.append(datetime.now())
+        self.flags.append(flag)
+
+    def __str__(self):
+        t = datetime.now()
+        temp = self.temps[-1]
+        date = self.dates[-1]
+        flag = self.flags[-1]
+
+        d = t - date      
+        if d < timedelta(days = 1): time_str = "{:02d}:{:02d}".format(date.hour, date.minute)
+        else: time_str = "{:02d}/{:02d}".format(date.month, date.days)
+
+        return "r={0} @{1} t={2:6.2f} flag={3}".format(self.addr, time_str, temp, flag)
+
+    # This is meant to be called periodically 
+    #  to keep memory footprint low.
+    # In the curren design of an update every 8s, a 2-week update
+    #  should have about 2.4k rows, so hopefully 10k memory is ok (per register)
+    def archiveData(self, filename, asof, delta): 
+        # Otherwise, just dump the data out to a CSV
+        #  Another ocmponent will read this in for analytics later
+        df = pd.DataFrame({
+            "temperature": self.temps,
+            "datetime": self.dates,
+            "flags": self.flags
+        })
+        df.to_csv(filename)
+
+        # Now we truncate the data to be fresher than "delta"
+
+        # Find the first date in dates that is older than days old.
+        #  (remember these lists are all stored in increasing order of time)
+        # so as long as "asof" is newer than anything in the list,
+        # all we have to do is find the first element younger than our delta.
+        found = None
+        for idx, t in enumerate(self.dates):
+            if asof - t < delta:
+                found = idx
+                break
+
+        # If we didn't actually find anything,
+        #  no truncation has to happen.
+        if found == None: return
+
+ 
+        # Truncate internal structure
+        self.temps = self.temps[found:]
+        self.dates = self.dates[found:]
+        self.flags = self.flags[found:]
 
     def openRegister(self):
         assert(self.state == SR_CLOSED)
@@ -49,31 +98,65 @@ class SmartRegister:
 class SmartThermostat:
     def __init__(self, radio):
         self.radio = radio
-        self.registers = {}
-        self.ambientTemp = []
+        # This houses all of our discovered smart registers.  The key is their
+        #  pseudo-MAC.   The initial value 0 represent this device, i.e. the thermostat's
+        #  own temperature reading.
+        self.registers = { 0: SmartRegister(0,0) }
+        self.flags = 0
+        self.lastTick = datetime.now()
+        self.lastSave = self.lastTick
+        self.TICK_FREQUENCY = timedelta(seconds = 4)
+        self.SAVE_FREQUENCY = timedelta(seconds = 30)
 
     def readTemp(self):
         t = TempSensor.read_temp()
-        self.ambientTemp.append(t)
-        if len(self.ambientTemp) > queue_size:
-            self.ambientTemp.pop(0)
+        self.registers[0].registerReading(t, 0)  #TODO Change this to system ON or OFF.
+
+    # This is called by radio
+    #  to process events.
+    def mainLoop(self, mesg):
+        self.recv(mesg)
+
+        # Figure out if we should do a self-update
+        t = datetime.now()
+        if t - self.lastTick > self.TICK_FREQUENCY:
+            self.tick()
+            self.lastTick = t
+
+        # Store off data
+        if t - self.lastSave > self.SAVE_FREQUENCY:
+            # isoformat() returns "2021-05-06T14:01:13.313976"
+            # [0:13] truncates 2 digits after T
+            suffix = t.isoformat()[0:13]
+            for r in self.registers.values():
+                r.archiveData(                    
+                    "data/register_{}_{}.csv".format(r.addr, suffix),
+                    t,
+                    timedelta(days=14))
+            self.lastSave = t
 
     # Ordinary clock tick with no radio activity
     def tick(self):
         # Read ambient temperature
         self.readTemp()
-        print("Thermostat temp {}".format(self.ambientTemp))
+        # Update log
+        outstr = ""
+        for r in self.registers.values():
+            outstr += r.__str__() + "   "
+        print(outstr)
+
+        ambientTemp = self.registers[0].temps[-1]
         # Decide if we should turn on thermostat?
-        if self.ambientTemp[-1] < 21.5:
+        if ambientTemp < 21.5:
             # Turn on thermostat
             # Switch relay if we have one...
 
             # Figure out what rooms to open or close.
-            flags = 0
+            self.flags = 0
             for r in self.registers.values():
-                if r.temps[-1] < 21.5: flags += r.flag
+                if r.temps[-1] < 22: self.flags += r.flag
             
-            self.radio.send("0 BAFFLE {}".format(flags));
+            self.radio.send("0 BAFFLE {}".format(self.flags));
 
         # Decide if we've lost sensors
 
@@ -93,7 +176,6 @@ class SmartThermostat:
             raise ThermostatException("Unknown command {} with args {} in SmartThermostat.recv.".format(mesgs[1], mesg))
         else:
             commands[mesgs[1]](mesgs[2:])
-            self.tick()
     
     def addr(self, args):
         # Message is of form
@@ -105,7 +187,9 @@ class SmartThermostat:
         if len(self.registers) == 0: flag = 1
         else: 
             max_flag = max([ r.flag for r in self.registers.values()])
-            flag = int(math.log2(max_flag)) + 1
+            # == 0 is our own flag, so we hardcode a bypass
+            if max_flag == 0: flag = 1
+            else: flag = int(math.log2(max_flag)) + 1
         if flag > 31:
             raise ThermostatException("Out of flags in SmartThermostat.")
 
@@ -126,7 +210,7 @@ class SmartThermostat:
         
         try:
             temp = float(args[1])
-            self.registers[addr].registerReading(temp)
+            self.registers[addr].registerReading(temp, self.flags)
         except ValueError as err:
             pass
 
