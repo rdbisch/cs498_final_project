@@ -46,8 +46,8 @@ class Radio:
             try:
                 print("<<< {}".format(packet[4:]))
                 recvCallback(str(packet[4:], "utf-8"))
-            except UnicodeDecodeError as err:
-                print("### Error encoding packet {}\n{}".format(packet, err))
+            except (ValueError, UnicodeDecodeError) as err:
+                print("### Error processing packet {}\n{}".format(packet, err))
                 self.badPackets += 1
 
     def send(self, data):

@@ -52,19 +52,30 @@ class SmartThermostat:
         self.registers = {}
         self.ambientTemp = []
 
-    def readTemp():
+    def readTemp(self):
         t = TempSensor.read_temp()
-        self.ambientTemp ++ t
+        self.ambientTemp.append(t)
         if len(self.ambientTemp) > queue_size:
             self.ambientTemp.pop(0)
 
     # Ordinary clock tick with no radio activity
     def tick(self):
         # Read ambient temperature
-        readTemp()
+        self.readTemp()
+        print("Thermostat temp {}".format(self.ambientTemp))
         # Decide if we should turn on thermostat?
+        if self.ambientTemp[-1] < 21.5:
+            # Turn on thermostat
+            # Switch relay if we have one...
+
+            # Figure out what rooms to open or close.
+            flags = 0
+            for r in self.registers.values():
+                if r.temps[-1] < 21.5: flags += r.flag
+            
+            self.radio.send("0 BAFFLE {}".format(flags));
+
         # Decide if we've lost sensors
-        # Decide if we should open/close rooms
 
     def recv(self, mesg):
         commands = { "ADDR": self.addr,
@@ -79,12 +90,10 @@ class SmartThermostat:
         if (addr != 0 and addr != 1): return
 
         if (mesgs[1] not in commands):
-            print("Command was -->|{}|<--".format(mesgs[1]))
-            for k in commands.keys():
-                print("\t{} == {}?   {}".format(k, mesgs[1], k == mesgs[1]))
             raise ThermostatException("Unknown command {} with args {} in SmartThermostat.recv.".format(mesgs[1], mesg))
         else:
             commands[mesgs[1]](mesgs[2:])
+            self.tick()
     
     def addr(self, args):
         # Message is of form
