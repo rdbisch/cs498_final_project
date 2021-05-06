@@ -8,13 +8,30 @@
  * and
  * Servo demo code sweep
  */
-
-#include <Adafruit_PCT2075.h>
 #include <SPI.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 #include <RH_RF95.h>
+#include <Servo.h>
+
+// Data wire is plugged into digital pin 2 on the Arduino
+#define ONE_WIRE_BUS 10
+
+// Setup a oneWire instance to communicate with any OneWire device
+OneWire oneWire(ONE_WIRE_BUS);  
+
+// Pass oneWire reference to DallasTemperature library
+DallasTemperature sensors(&oneWire);
 
 /* Comment out for real run */
 #define DEBUG
+
+/* Which pin is servo on */
+#define SERVO_PIN 11
+Servo baffle;
+int baffle_pos;
+#define BAFFLE_OPEN 180
+#define BAFFLE_CLOSED -180
 
 /* for feather32u4 */
 #define RFM95_CS 8
@@ -26,8 +43,6 @@
  
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
-
-Adafruit_PCT2075 PCT2075;
 
 /* SmartRegister settings */
 #define SR_UNDEFINED 0xDEADBEEF
@@ -105,26 +120,20 @@ void setup() {
   rf95.setTxPower(23, false);
 
 
+  /**** ****/
+  sensors.begin();  // Start up the library
 
+  /*** Setup Servo ***/
+  baffle.attach(SERVO_PIN);
+  baffle_open();
+  delay(15);
+  
+}
 
-
-  /******* PCT2075 Setup **********/
-  PCT2075 = Adafruit_PCT2075();
-  while (1) {
-    if (!PCT2075.begin()) {
-#ifdef DEBUG          
-      Serial.println("Couldn't find PCT2075 chip");
-#endif
-      while (1) {
-        digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-        delay(500);                       // wait for a second
-        digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-        delay(250);              
-      }
-    } else {
-      break;
-    }
-  }
+float getTemp() {
+  // Send the command to get temperatures
+  sensors.requestTemperatures(); 
+  return sensors.getTempCByIndex(0);
 }
  
 int16_t packetnum = 0;  // packet counter, we increment per xmission
@@ -137,7 +146,7 @@ void loop() {
   digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
   delay(500);  
 
-  float f = PCT2075.getTemperature();
+  float f = getTemp();
   char radiopacket[30];
   sprintf(radiopacket, "1 POST %u %d.%02d", sr_addr, (int)f, (int)(f*100)%100);
 #ifdef DEBUG
@@ -172,7 +181,6 @@ next:
         }
     }
   }
-
   // Mimic sleeping
   digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
   delay(500);                       // wait for a second
@@ -188,5 +196,23 @@ void setFlag(uint8_t* message) {
 
 /** Handle BAFFLE message **/
 void setBaffle(uint8_t* message) {
-  ;
+  int flags;
+  sscanf(message, "BAFFLE %d", &flags);
+
+  if (flags & (1<<sr_flag)) baffle_open();
+  else baffle_close();
+}
+
+void baffle_open() {
+  if (baffle_pos != BAFFLE_OPEN) {
+      baffle.write(BAFFLE_OPEN);
+      baffle_pos = BAFFLE_OPEN;
+  }    
+}
+
+void baffle_close() {
+  if (baffle_pos != BAFFLE_CLOSED) {
+      baffle.write(BAFFLE_CLOSED);
+      baffle_pos = BAFFLE_CLOSED;
+  }    
 }
