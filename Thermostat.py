@@ -30,7 +30,7 @@ class SmartRegister:
     def registerReading(self, temp, flag):        
         self.temps.append(temp)
         self.dates.append(datetime.now())
-        self.flags.append(flag)
+        self.flags.append(int((flag & self.flag) > 0))
 
     def __str__(self):
         t = datetime.now()
@@ -73,7 +73,6 @@ class SmartRegister:
         # If we didn't actually find anything,
         #  no truncation has to happen.
         if found == None: return
-
  
         # Truncate internal structure
         self.temps = self.temps[found:]
@@ -107,6 +106,13 @@ class SmartThermostat:
         self.lastSave = self.lastTick
         self.TICK_FREQUENCY = timedelta(seconds = 4)
         self.SAVE_FREQUENCY = timedelta(seconds = 30)
+        self.demo = 0
+
+    def archiveData(self, filename):
+        with open(filename, "w") as f:
+            f.write("registers\n")
+            for addr in self.registers.keys():
+                f.write(str(addr) + "\n")
 
     def readTemp(self):
         t = TempSensor.read_temp()
@@ -125,9 +131,11 @@ class SmartThermostat:
 
         # Store off data
         if t - self.lastSave > self.SAVE_FREQUENCY:
+            print("\n\n============= DATA FLUSH ===============\n\n")
             # isoformat() returns "2021-05-06T14:01:13.313976"
             # [0:13] truncates 2 digits after T
             suffix = t.isoformat()[0:13]
+            self.archiveData("data/smart_{}.csv".format(suffix))
             for r in self.registers.values():
                 r.archiveData(                    
                     "data/register_{}_{}.csv".format(r.addr, suffix),
@@ -140,23 +148,28 @@ class SmartThermostat:
         # Read ambient temperature
         self.readTemp()
         # Update log
-        outstr = ""
+        outstr = "{0:4d}/{1:7d} (bad/total)pckt   ".format(self.radio.badPackets, self.radio.packetCount)  
         for r in self.registers.values():
             outstr += r.__str__() + "   "
         print(outstr)
 
         ambientTemp = self.registers[0].temps[-1]
         # Decide if we should turn on thermostat?
-        if ambientTemp < 21.5:
+        if ambientTemp < 23:
             # Turn on thermostat
             # Switch relay if we have one...
 
             # Figure out what rooms to open or close.
-            self.flags = 0
+            if self.demo % 4 == 0: threshold = 21
+            else: threshold = 23
+            self.demo += 1
+
+            temp = 0
             for r in self.registers.values():
-                if r.temps[-1] < 22: self.flags += r.flag
-            
-            self.radio.send("0 BAFFLE {}".format(self.flags));
+                if r.temps[-1] < threshold: temp += r.flag
+            if temp != self.flags:
+                self.flags = temp
+                self.radio.send("0 BAFFLE {} ".format(self.flags));
 
         # Decide if we've lost sensors
 
@@ -173,7 +186,7 @@ class SmartThermostat:
         if (addr != 0 and addr != 1): return
 
         if (mesgs[1] not in commands):
-            raise ThermostatException("Unknown command {} with args {} in SmartThermostat.recv.".format(mesgs[1], mesg))
+            print("Unknown command {} with args {} in SmartThermostat.recv.".format(mesgs[1], mesg))
         else:
             commands[mesgs[1]](mesgs[2:])
     
@@ -198,7 +211,7 @@ class SmartThermostat:
         reg = SmartRegister(addr, flag)
         assert(addr not in self.registers)
         self.registers[addr] = reg
-        self.radio.send("{} SETFLAG {}".format(addr, flag))
+        self.radio.send("{} SETFLAG {} ".format(addr, flag))
 
     def post(self, args):
         addr = int(args[0])
