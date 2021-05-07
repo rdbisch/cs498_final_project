@@ -30,8 +30,8 @@ DallasTemperature sensors(&oneWire);
 #define SERVO_PIN 11
 Servo baffle;
 int baffle_pos;
-#define BAFFLE_OPEN 180
-#define BAFFLE_CLOSED -180
+#define BAFFLE_OPEN 90
+#define BAFFLE_CLOSED -90
 
 /* for feather32u4 */
 #define RFM95_CS 8
@@ -127,7 +127,8 @@ void setup() {
   baffle.attach(SERVO_PIN);
   baffle_open();
   delay(15);
-  
+
+  Serial.println("\n\n\nMAIN LOOP STARTING\n\n\n");  
 }
 
 float getTemp() {
@@ -165,15 +166,19 @@ next:
         unsigned int check_addr;
         int bytes;
         uint8_t* rest = 0;
-        
+
+        buf[len] = 0;
+        Serial.print("<");
+        Serial.println((char*)buf);
         int ret = sscanf(buf, "%u %n", &check_addr, &bytes);
-        if (ret < 1 || check_addr != sr_addr) {
+        if (ret < 1 || (check_addr > 0 && (check_addr != sr_addr))) {
+          Serial.println("address did not match pattern.\n");
           goto next;
         }
 
         rest = buf + bytes;
-        if (rest[0] == 'R') setFlag(bytes + ret);
-        else if (rest[0] == 'S') setBaffle(bytes + ret);
+        if (rest[0] == 'S') setFlag(rest);
+        else if (rest[0] == 'B') setBaffle(rest);
         else {
           Serial.println("Unhandled command in message.");
           Serial.println((char*)buf);
@@ -191,7 +196,11 @@ next:
 
 /** Handle SETFLAG message **/
 void setFlag(uint8_t* message) {
+  Serial.println("in setFlag....sr_flag was...");
+  Serial.println((char*)message);
+  Serial.println(sr_flag);
   sscanf(message, "SETFLAG %d", &sr_flag);
+  Serial.println(sr_flag);
 }
 
 /** Handle BAFFLE message **/
@@ -199,12 +208,18 @@ void setBaffle(uint8_t* message) {
   int flags;
   sscanf(message, "BAFFLE %d", &flags);
 
-  if (flags & (1<<sr_flag)) baffle_open();
+  int r = (flags & sr_flag);
+  Serial.println("setBaffle debug  flags, sr_flags, r");
+  Serial.println(flags);
+  Serial.println(sr_flag);
+  Serial.println(r);
+  if (r) baffle_open();
   else baffle_close();
 }
 
 void baffle_open() {
   if (baffle_pos != BAFFLE_OPEN) {
+      Serial.println("OPENING BAFFLE");
       baffle.write(BAFFLE_OPEN);
       baffle_pos = BAFFLE_OPEN;
   }    
@@ -212,6 +227,7 @@ void baffle_open() {
 
 void baffle_close() {
   if (baffle_pos != BAFFLE_CLOSED) {
+      Serial.println("CLOSING BAFFLE");
       baffle.write(BAFFLE_CLOSED);
       baffle_pos = BAFFLE_CLOSED;
   }    
