@@ -8,7 +8,7 @@ device_file = device_folder + '/w1_slave'
 def read_temp_raw():
     f = open(device_file, 'r')
     lines = f.readlines()
-    print(lines)
+    #print(lines)
     f.close()
     return lines
  
