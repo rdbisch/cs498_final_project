@@ -24,7 +24,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
 /* Comment out for real run */
-//#define DEBUG
+#define DEBUG
 
 /* Which pin is servo on */
 #define SERVO_PIN 11
@@ -32,6 +32,11 @@ Servo baffle;
 int baffle_pos;
 #define BAFFLE_OPEN 90
 #define BAFFLE_CLOSED -90
+
+/* For battery measurement 
+ *  https://learn.adafruit.com/adafruit-feather-32u4-basic-proto/power-management
+ */
+#define VBATPIN A4
 
 /* for feather32u4 */
 #define RFM95_CS 8
@@ -150,9 +155,15 @@ void loop() {
   digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
   delay(500);  
 
+  float v = analogRead(VBATPIN);
+  v *= 2;    // we divided by 2, so multiply back
+  v *= 3.3;  // Multiply by 3.3V, our reference voltage
+  v /= 1024; // convert to voltage
+  //Serial.print("VBat: " ); Serial.println(measuredvbat);
+
   float f = getTemp();
   char radiopacket[30];
-  sprintf(radiopacket, "1 POST %u %d.%02d", sr_addr, (int)f, (int)(f*100)%100);
+  sprintf(radiopacket, "1 POST %u %d.%02d %d.02%d", sr_addr, (int)f, (int)(f*100)%100, (int)v, (int)(v*100));
 #ifdef DEBUG
   Serial.print("Sending "); Serial.println(radiopacket);
 #endif
