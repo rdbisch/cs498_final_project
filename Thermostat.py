@@ -22,27 +22,35 @@ class SmartRegister:
     def __init__(self, addr, flag):
         self.temps = []
         self.dates = []
-        self.flags = []        
+        self.flags = []
+        self.voltage = []     
         self.state = SR_OPEN
         self.addr = addr
         self.flag = flag
 
-    def registerReading(self, temp, flag):        
+    def registerReading(self, temp, flag, voltage):        
         self.temps.append(temp)
         self.dates.append(datetime.now())
         self.flags.append(int((flag & self.flag) > 0))
+        self.voltage.append(voltage)
 
+    # Make a neatly formattd string representation 
+    # this will be printed to main console 
     def __str__(self):
         t = datetime.now()
         temp = self.temps[-1]
         date = self.dates[-1]
         flag = self.flags[-1]
+        voltage = self.voltage[-1]
 
         d = t - date      
         if d < timedelta(days = 1): time_str = "{:02d}:{:02d}".format(date.hour, date.minute)
         else: time_str = "{:02d}/{:02d}".format(date.month, date.days)
 
-        return "r={0} @{1} t={2:6.2f} flag={3}".format(self.addr, time_str, temp, flag)
+        if voltage != None:
+            return "r={0} {4:4.2f}v @{1} t={2:6.2f} flag={3}".format(self.addr, time_str, temp, flag, voltage)
+        else:
+            return "r={0}   NAv @{1} t={2:6.2f} flag={3}".format(self.addr, time_str, temp, flag, voltage)
 
     # This is meant to be called periodically 
     #  to keep memory footprint low.
@@ -54,7 +62,8 @@ class SmartRegister:
         df = pd.DataFrame({
             "temperature": self.temps,
             "datetime": self.dates,
-            "flags": self.flags
+            "flags": self.flags,
+            "voltage": self.voltage
         })
         df.to_csv(filename)
 
@@ -78,6 +87,7 @@ class SmartRegister:
         self.temps = self.temps[found:]
         self.dates = self.dates[found:]
         self.flags = self.flags[found:]
+        self.voltage = self.voltage[found:]
 
     def openRegister(self):
         assert(self.state == SR_CLOSED)
@@ -116,7 +126,7 @@ class SmartThermostat:
 
     def readTemp(self):
         t = TempSensor.read_temp()
-        self.registers[0].registerReading(t, 0)  #TODO Change this to system ON or OFF.
+        self.registers[0].registerReading(t, 0, None)  #TODO Change this to system ON or OFF.
 
     # This is called by radio
     #  to process events.
@@ -131,7 +141,7 @@ class SmartThermostat:
 
         # Store off data
         if t - self.lastSave > self.SAVE_FREQUENCY:
-            print("\n\n============= DATA FLUSH ===============\n\n")
+            print("============= DATA FLUSH ===============\n")
             # isoformat() returns "2021-05-06T14:01:13.313976"
             # [0:13] truncates 2 digits after T
             suffix = t.isoformat()[0:13]
@@ -148,7 +158,7 @@ class SmartThermostat:
         # Read ambient temperature
         self.readTemp()
         # Update log
-        outstr = "{0:4d}/{1:7d} (bad/total)pckt   ".format(self.radio.badPackets, self.radio.packetCount)  
+        outstr = "{0:3d}/{1:5d} (bad/total)pckt   ".format(self.radio.badPackets, self.radio.packetCount)  
         for r in self.registers.values():
             outstr += r.__str__() + "   "
         print(outstr)
@@ -223,7 +233,8 @@ class SmartThermostat:
         
         try:
             temp = float(args[1])
-            self.registers[addr].registerReading(temp, self.flags)
+            voltage = float(args[2])
+            self.registers[addr].registerReading(temp, self.flags, voltage)
         except ValueError as err:
             pass
 

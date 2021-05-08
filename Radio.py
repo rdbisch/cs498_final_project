@@ -43,12 +43,12 @@ class Radio:
             #print("Received (raw payload): {0}".format(packet[4:]))
             #print("RSSI: {0}".format(self.rfm9x.last_rssi))
             try:
-                print("<<< {}".format(packet[4:]))
+                #print("<<< {}".format(packet[4:]))
                 recvCallback(str(packet[4:], "utf-8"))
             except (ValueError, UnicodeDecodeError) as err:
                 #print("### Error processing packet {}\n{}".format(packet, err))
                 self.badPackets += 1
 
     def send(self, data):
-        print(">>> {}".format(data))
+        #print(">>> {}".format(data))
         self.rfm9x.send(bytearray(data, "utf-8"))
