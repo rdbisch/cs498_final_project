@@ -28,16 +28,15 @@ class Radio:
     
     def mainLoop(self, recvCallback):
         while True:
-            self.packetCount += 1
-
-            if self.packetCount % 1000 == 0:
-                print("Packets Received {} Bad {} % {}".format(self.packetCount, self.badPackets, float(self.badPackets/self.packetCount)))
+            #if self.packetCount % 1000 == 0:
+            #    print("Packets Received {} Bad {} % {}".format(self.packetCount, self.badPackets, float(self.badPackets/self.packetCount)))
 
             packet = self.rfm9x.receive(with_header=True, keep_listening=True, with_ack=True)
             if packet == None:
                 time.sleep(0.1)
                 continue
-           
+
+            self.packetCount += 1           
             # Received a packet!
             # Print out the raw bytes of the packet:
             #print("Received (raw header):", [hex(x) for x in packet[0:4]])
@@ -47,7 +46,7 @@ class Radio:
                 print("<<< {}".format(packet[4:]))
                 recvCallback(str(packet[4:], "utf-8"))
             except (ValueError, UnicodeDecodeError) as err:
-                print("### Error processing packet {}\n{}".format(packet, err))
+                #print("### Error processing packet {}\n{}".format(packet, err))
                 self.badPackets += 1
 
     def send(self, data):
