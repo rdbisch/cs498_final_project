@@ -44,13 +44,17 @@ class SmartRegister:
         voltage = self.voltage[-1]
 
         d = t - date      
-        if d < timedelta(days = 1): time_str = "{:02d}:{:02d}".format(date.hour, date.minute)
-        else: time_str = "{:02d}/{:02d}".format(date.month, date.days)
+        if d < timedelta(days = 1):
+            time_str = "{:02d}:{:02d}".format(date.hour, date.minute)
+        else:
+            time_str = "{:02d}/{:02d}".format(date.month, date.days)
 
         if voltage != None:
-            return "r={0} {4:4.2f}v @{1} t={2:6.2f} flag={3}".format(self.addr, time_str, temp, flag, voltage)
+            s = "r={0} {4:4.2f}v @{1} t={2:6.2f} flag={3}"
         else:
-            return "r={0}   NAv @{1} t={2:6.2f} flag={3}".format(self.addr, time_str, temp, flag, voltage)
+            s = "r={0}   NAv @{1} t={2:6.2f} flag={3}"
+
+        return s.format(self.addr, time_str, temp, flag, voltage)
 
     # This is meant to be called periodically 
     #  to keep memory footprint low.
@@ -158,7 +162,9 @@ class SmartThermostat:
         # Read ambient temperature
         self.readTemp()
         # Update log
-        outstr = "{0:3d}/{1:5d} (bad/total)pckt   ".format(self.radio.badPackets, self.radio.packetCount)  
+        outstr = "{0:3d}/{1:5d} (bad/total)pckt   ".format(
+            self.radio.badPackets,
+            self.radio.packetCount)  
         for r in self.registers.values():
             outstr += r.__str__() + "   "
         print(outstr)
@@ -196,7 +202,8 @@ class SmartThermostat:
         if (addr != 0 and addr != 1): return
 
         if (mesgs[1] not in commands):
-            print("Unknown command {} with args {} in SmartThermostat.recv.".format(mesgs[1], mesg))
+            t = "Unknown command {} with args {} in SmartThermostat.recv."
+            print(t.format(mesgs[1], mesg))
         else:
             commands[mesgs[1]](mesgs[2:])
     
