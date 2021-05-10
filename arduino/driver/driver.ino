@@ -90,13 +90,14 @@ void setup() {
   while (!rf95.init()) {
 #ifdef DEBUG
     Serial.println("LoRa radio init failed");
-    Serial.println("Uncomment '#define SERIAL_DEBUG' in RH_RF95.cpp for detailed debug info");
+    Serial.println("Uncomment '#define SERIAL_DEBUG' in RH_RF95.cpp for");
+    Serial.println(" detailed debug info");
 #endif
     while (1) {
-      digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-      delay(250);                       // wait for a second
-      digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-      delay(250);           
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(250);
+      digitalWrite(LED_BUILTIN, LOW);
+      delay(250);
     }
   }
 #ifndef DEBUG
@@ -108,22 +109,17 @@ void setup() {
       Serial.println("setFrequency failed");
 #endif
       while (1) {
-        digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-        delay(250);                       // wait for a second
-        digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-        delay(500);          
+        digitalWrite(LED_BUILTIN, HIGH);
+        delay(250);
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(500);
       }
   }
 #ifdef DEBUG
   Serial.print("Set Freq to: "); Serial.println(RF95_FREQ);
 #endif
-  // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
 
-  // The default transmitter power is 13dBm, using PA_BOOST.
-  // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
-  // you can set transmitter powers from 5 to 23 dBm:
   rf95.setTxPower(23, false);
-
 
   /**** ****/
   sensors.begin();  // Start up the library
@@ -149,21 +145,21 @@ int16_t packetnum = 0;  // packet counter, we increment per xmission
 int state = 0;
 
 void loop() {
-
-  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(500);                       // wait for a second
-  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-  delay(500);  
-
   float v = analogRead(VBATPIN);
   v *= 2;    // we divided by 2, so multiply back
   v *= 3.3;  // Multiply by 3.3V, our reference voltage
   v /= 1024; // convert to voltage
-  //Serial.print("VBat: " ); Serial.println(measuredvbat);
 
   float f = getTemp();
   char radiopacket[30];
-  sprintf(radiopacket, "1 POST %u %d.%02d %d.02%d", sr_addr, (int)f, (int)(f*100)%100, (int)v, (int)(v*100));
+  sprintf(radiopacket,
+    "1 POST %u %d.%02d %d.02%d",
+    sr_addr,
+    (int)f,
+    (int)(f*100)%100,
+    (int)v,
+    (int)(v*100));
+    
 #ifdef DEBUG
   Serial.print("Sending "); Serial.println(radiopacket);
 #endif
@@ -207,11 +203,11 @@ next:
         }
     }
   }
-  // Mimic sleeping
-  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(500);                       // wait for a second
-  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-  delay(500);  
+  /* Blink the LED so we can see things are still working. */
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
 }
 
 /** Handle SETFLAG message **/
