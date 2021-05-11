@@ -24,7 +24,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
 /* Comment out for real run */
-#define DEBUG
+/* #define DEBUG */
 
 /* Which pin is servo on */
 #define SERVO_PIN 11
@@ -100,7 +100,7 @@ void setup() {
       delay(250);
     }
   }
-#ifndef DEBUG
+#ifdef DEBUG
   Serial.println("LoRa radio init OK!");
 #endif
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
@@ -158,7 +158,7 @@ void loop() {
     (int)f,
     (int)(f*100)%100,
     (int)v,
-    (int)(v*100));
+    (int)(v*100)%100);
     
 #ifdef DEBUG
   Serial.print("Sending "); Serial.println(radiopacket);
