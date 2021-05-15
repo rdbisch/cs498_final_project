@@ -36,7 +36,7 @@ int baffle_pos;
 /* For battery measurement 
  *  https://learn.adafruit.com/adafruit-feather-32u4-basic-proto/power-management
  */
-#define VBATPIN A4
+#define VBATPIN A9
 
 /* for feather32u4 */
 #define RFM95_CS 8
