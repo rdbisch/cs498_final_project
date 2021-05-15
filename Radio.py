@@ -30,6 +30,7 @@ class Radio:
         while True:
             packet = self.rfm9x.receive(with_header=True, keep_listening=True, with_ack=True)
             if packet == None:
+                recvCallback(None)
                 time.sleep(0.1)
                 continue
 
@@ -37,9 +38,11 @@ class Radio:
             # Received a packet!
             # Print out the raw bytes of the packet:
             try:
+                print("<<{}".format(str(packet[4:], "utf-8")))
                 recvCallback(str(packet[4:], "utf-8"))
             except (ValueError, UnicodeDecodeError) as err:
                 self.badPackets += 1
 
     def send(self, data):
+        print(">>{}".format(data))
         self.rfm9x.send(bytearray(data, "utf-8"))

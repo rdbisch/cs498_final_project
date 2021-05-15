@@ -37,6 +37,9 @@ class SmartRegister:
     # Make a neatly formattd string representation 
     # this will be printed to main console 
     def __str__(self):
+        if len(self.temps) == 0:
+            return "NO DATA"
+
         t = datetime.now()
         temp = self.temps[-1]
         date = self.dates[-1]
@@ -135,7 +138,7 @@ class SmartThermostat:
     # This is called by radio
     #  to process events.
     def mainLoop(self, mesg):
-        self.recv(mesg)
+        if mesg != None: self.recv(mesg)
 
         # Figure out if we should do a self-update
         t = datetime.now()
@@ -171,18 +174,18 @@ class SmartThermostat:
 
         ambientTemp = self.registers[0].temps[-1]
         # Decide if we should turn on thermostat?
-        if ambientTemp < 23:
+        if ambientTemp < 26:
             # Turn on thermostat
             # Switch relay if we have one...
 
             # Figure out what rooms to open or close.
-            if self.demo % 4 == 0: threshold = 21
-            else: threshold = 23
+            if self.demo % 4 == 0: threshold = 18
+            else: threshold = 26
             self.demo += 1
 
             temp = 0
             for r in self.registers.values():
-                if r.temps[-1] < threshold: temp += r.flag
+                if len(r.temps) > 0 and r.temps[-1] < threshold: temp += r.flag
             if temp != self.flags:
                 self.flags = temp
                 self.radio.send("0 BAFFLE {} ".format(self.flags));
